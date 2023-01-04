@@ -76,7 +76,7 @@ if __name__ == '__main__':
     eff = MusicEffect(ctr)
     oldmode = ctr.get_mode()["mode"]
     eff.launch_rt()
-    playsound(sound = audio_path)
+    playsound(sound = audio_path, block = False)
     print("Started continuous effect - press Return to stop it")
     input()
     eff.stop_rt()
