@@ -5,7 +5,7 @@ import colorsys
 from pydub import AudioSegment
 from pydub.scipy_effects import band_pass_filter
 
-from playsound import playsound
+import simpleaudio
 
 audio_path = "./monsters.mp3"
 
@@ -76,7 +76,12 @@ if __name__ == '__main__':
     eff = MusicEffect(ctr)
     oldmode = ctr.get_mode()["mode"]
     eff.launch_rt()
-    playsound(sound = audio_path, block = False)
+    simpleaudio.play_buffer(
+        audio.raw_data,
+        num_channels=audio.channels,
+        bytes_per_sample=audio.sample_width,
+        sample_rate=audio.frame_rate
+    )
     print("Started continuous effect - press Return to stop it")
     input()
     eff.stop_rt()
