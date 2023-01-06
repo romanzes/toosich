@@ -3,77 +3,88 @@ from xled_plus.samples.sample_setup import *
 import colorsys
 
 from pydub import AudioSegment
-from pydub.scipy_effects import band_pass_filter
+
+import numpy as np
+
+from scipy.io.wavfile import read, write
 
 import simpleaudio
 
 audio_path = "./monsters.mp3"
-
-# Load the audio file
-audio = AudioSegment.from_mp3(audio_path)
-
-bands = []
+num_intervals = 10
 
 class MusicEffect(Effect):
-    def __init__(self, ctr):
+    def __init__(self, ctr, audio):
         super(MusicEffect, self).__init__(ctr)
-        self.time = 0
+        self.frame = 0
+        self.magnitudes = calc_magnitudes(self.preferred_fps, audio)
 
     def reset(self, numframes):
         self.pattern = self.ctr.make_solid_pattern(hsl_color(0.0, 1.0, 0.0))
 
-    def update_band(self, pat, time_start, time_end, index):
-        slice = bands[index][time_start:time_end]
-        loudness = slice.max / bands[index].max_possible_amplitude
-        r, g, b = colorsys.hsv_to_rgb(loudness, 1.0, 1.0)
-        for i in range(index * 21, (index + 1) * 21):
-            ctr.modify_pattern(pat, i, (int(r * 255), int(g * 255), int(b * 255)))
-
     def getnext(self):
-        time_elapsed = 1000.0 / self.preferred_fps
         pat = ctr.copy_pattern(self.pattern)
-        time_start = self.time
-        time_end = self.time + time_elapsed
-        self.update_band(pat, time_start, time_end, 0)
-        self.update_band(pat, time_start, time_end, 1)
-        self.update_band(pat, time_start, time_end, 2)
-        self.update_band(pat, time_start, time_end, 3)
-        self.update_band(pat, time_start, time_end, 4)
-        self.update_band(pat, time_start, time_end, 5)
-        self.update_band(pat, time_start, time_end, 6)
-        self.update_band(pat, time_start, time_end, 7)
-        self.update_band(pat, time_start, time_end, 8)
-        self.update_band(pat, time_start, time_end, 9)
-        self.time += time_elapsed
+        for i in range(0, num_intervals):
+            loudness = self.magnitudes[self.frame, i] / 10000
+            r, g, b = colorsys.hsv_to_rgb(loudness, 1.0, 1.0)
+            for j in range(i * 21, (i + 1) * 21):
+                ctr.modify_pattern(pat, j, (int(r * 255), int(g * 255), int(b * 255)))
+        self.frame += 1
         return pat
 
-def init_bands():
-    print("Filtering band 1")
-    bands.append(audio.band_pass_filter(20, 2000))
-    print("Filtering band 2")
-    bands.append(audio.band_pass_filter(2000, 4000))
-    print("Filtering band 3")
-    bands.append(audio.band_pass_filter(4000, 6000))
-    print("Filtering band 4")
-    bands.append(audio.band_pass_filter(6000, 8000))
-    print("Filtering band 5")
-    bands.append(audio.band_pass_filter(8000, 10000))
-    print("Filtering band 6")
-    bands.append(audio.band_pass_filter(10000, 12000))
-    print("Filtering band 7")
-    bands.append(audio.band_pass_filter(12000, 14000))
-    print("Filtering band 8")
-    bands.append(audio.band_pass_filter(14000, 16000))
-    print("Filtering band 9")
-    bands.append(audio.band_pass_filter(16000, 18000))
-    print("Filtering band 10")
-    bands.append(audio.band_pass_filter(18000, 20000))
+def calc_magnitudes(framerate, audio):
+    # Convert the audio data to a wave file
+    audio.export('audio.wav', format='wav')
 
-if __name__ == '__main__':
-    init_bands()
+    # Read in the wave file using scipy.io.wavfile
+    Fs, data = read('audio.wav')
+
+    # Convert the audio data to a NumPy array
+    audio = np.array(data, dtype=float)
+
+    # Get the length of the audio data
+    N = len(audio)
+
+    # Calculate the frequencies for each element in the FFT output
+    frequencies = np.fft.fftfreq(N, 1/Fs)
+
+    # Calculate the length of the audio in frames
+    audio_length = len(audio) / Fs * framerate
+
+    # Generate equal frequency intervals from 0 Hz to the maximum frequency
+    max_freq = np.max(frequencies)
+    intervals = np.linspace(0, max_freq, num_intervals+1)
+
+    # Initialize the 2D array with zeros
+    result = np.zeros((int(audio_length), num_intervals))
+
+    Ff = Fs / framerate
+
+    # Iterate over the time intervals
+    for i in range(int(audio_length)):
+        # Select the audio data for the current time interval
+        interval_data = audio[int(i*Ff):int((i+1)*Ff)]
+
+        # Perform the FFT on the interval data
+        interval_fft = np.fft.fft(interval_data)
+
+        # Recalculate the frequencies for the interval data
+        interval_freqs = np.fft.fftfreq(len(interval_data), 1/Fs)
+
+        # Iterate over the frequency intervals and calculate the average magnitude
+        for j in range(num_intervals):
+            low_freq = intervals[j]
+            high_freq = intervals[j+1]
+            selected_mags = np.abs(interval_fft[(interval_freqs >= low_freq) & (interval_freqs <= high_freq)])
+            result[i, j] = np.mean(selected_mags)
+    return result
+
+if __name__ == '__main__': 
+    # Load the audio file
+    audio = AudioSegment.from_mp3(audio_path)
     ctr = setup_control()
     ctr.adjust_layout_aspect(1.0)  # How many times wider than high is the led installation?
-    eff = MusicEffect(ctr)
+    eff = MusicEffect(ctr, audio)
     oldmode = ctr.get_mode()["mode"]
     eff.launch_rt()
     simpleaudio.play_buffer(
