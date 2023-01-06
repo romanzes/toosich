@@ -25,10 +25,13 @@ class MusicEffect(Effect):
     def getnext(self):
         pat = ctr.copy_pattern(self.pattern)
         for i in range(0, num_intervals):
-            loudness = self.magnitudes[self.frame, i] / 10000
-            r, g, b = colorsys.hsv_to_rgb(loudness, 1.0, 1.0)
-            for j in range(i * 21, (i + 1) * 21):
-                ctr.modify_pattern(pat, j, (int(r * 255), int(g * 255), int(b * 255)))
+            loudness = self.magnitudes[self.frame, i] / 20000
+            for j in range(0, 21):
+                index = i * 21 + j
+                if j / 21 < loudness:
+                    ctr.modify_pattern(pat, index, (255, 0, 0))
+                else:
+                    ctr.modify_pattern(pat, index, (0, 0, 255))
         self.frame += 1
         return pat
 
