@@ -10,6 +10,8 @@ from scipy.io.wavfile import read, write
 
 import simpleaudio
 
+import math
+
 audio_path = "./monsters.mp3"
 num_intervals = 10
 
@@ -17,7 +19,7 @@ class MusicEffect(Effect):
     def __init__(self, ctr, audio):
         super(MusicEffect, self).__init__(ctr)
         self.frame = 0
-        self.magnitudes = self.calc_magnitudes(audio)
+        self.calc_magnitudes(audio)
 
     def reset(self, numframes):
         self.pattern = self.ctr.make_solid_pattern(hsl_color(0.0, 1.0, 0.0))
@@ -25,7 +27,12 @@ class MusicEffect(Effect):
     def getnext(self):
         pat = ctr.copy_pattern(self.pattern)
         for i in range(0, num_intervals):
-            loudness = self.magnitudes[self.frame, i] / 20000
+            magnitude = self.magnitudes[self.frame, i]
+            if magnitude <= 0:
+                continue
+            loudness = math.sqrt(magnitude) / math.sqrt(self.max_magnitude)
+            if i == 0:
+                print(loudness)
             for j in range(0, 21):
                 index = i * 21 + j
                 if j / 21 < loudness:
@@ -48,6 +55,9 @@ class MusicEffect(Effect):
         # Get the length of the audio data
         N = len(audio)
 
+        # Perform the FFT on the audio data
+        fft_out = np.fft.fft(audio)
+
         # Calculate the frequencies for each element in the FFT output
         frequencies = np.fft.fftfreq(N, 1/Fs)
 
@@ -58,8 +68,11 @@ class MusicEffect(Effect):
         max_freq = np.max(frequencies)
         intervals = np.linspace(0, max_freq, num_intervals+1)
 
+        # Calculate the maximum magnitude
+        self.max_magnitude = np.max(np.abs(fft_out))
+
         # Initialize the 2D array with zeros
-        result = np.zeros((int(audio_length), num_intervals))
+        magnitudes = np.zeros((int(audio_length), num_intervals))
 
         Ff = Fs / self.preferred_fps
 
@@ -79,8 +92,8 @@ class MusicEffect(Effect):
                 low_freq = intervals[j]
                 high_freq = intervals[j+1]
                 selected_mags = np.abs(interval_fft[(interval_freqs >= low_freq) & (interval_freqs <= high_freq)])
-                result[i, j] = np.mean(selected_mags)
-        return result
+                magnitudes[i, j] = np.mean(selected_mags)
+        self.magnitudes = magnitudes
 
 if __name__ == '__main__': 
     # Load the audio file
