@@ -17,7 +17,7 @@ class MusicEffect(Effect):
     def __init__(self, ctr, audio):
         super(MusicEffect, self).__init__(ctr)
         self.frame = 0
-        self.magnitudes = calc_magnitudes(self.preferred_fps, audio)
+        self.magnitudes = self.calc_magnitudes(audio)
 
     def reset(self, numframes):
         self.pattern = self.ctr.make_solid_pattern(hsl_color(0.0, 1.0, 0.0))
@@ -35,52 +35,52 @@ class MusicEffect(Effect):
         self.frame += 1
         return pat
 
-def calc_magnitudes(framerate, audio):
-    # Convert the audio data to a wave file
-    audio.export('audio.wav', format='wav')
+    def calc_magnitudes(self, audio):
+        # Convert the audio data to a wave file
+        audio.export('audio.wav', format='wav')
 
-    # Read in the wave file using scipy.io.wavfile
-    Fs, data = read('audio.wav')
+        # Read in the wave file using scipy.io.wavfile
+        Fs, data = read('audio.wav')
 
-    # Convert the audio data to a NumPy array
-    audio = np.array(data, dtype=float)
+        # Convert the audio data to a NumPy array
+        audio = np.array(data, dtype=float)
 
-    # Get the length of the audio data
-    N = len(audio)
+        # Get the length of the audio data
+        N = len(audio)
 
-    # Calculate the frequencies for each element in the FFT output
-    frequencies = np.fft.fftfreq(N, 1/Fs)
+        # Calculate the frequencies for each element in the FFT output
+        frequencies = np.fft.fftfreq(N, 1/Fs)
 
-    # Calculate the length of the audio in frames
-    audio_length = len(audio) / Fs * framerate
+        # Calculate the length of the audio in frames
+        audio_length = len(audio) / Fs * self.preferred_fps
 
-    # Generate equal frequency intervals from 0 Hz to the maximum frequency
-    max_freq = np.max(frequencies)
-    intervals = np.linspace(0, max_freq, num_intervals+1)
+        # Generate equal frequency intervals from 0 Hz to the maximum frequency
+        max_freq = np.max(frequencies)
+        intervals = np.linspace(0, max_freq, num_intervals+1)
 
-    # Initialize the 2D array with zeros
-    result = np.zeros((int(audio_length), num_intervals))
+        # Initialize the 2D array with zeros
+        result = np.zeros((int(audio_length), num_intervals))
 
-    Ff = Fs / framerate
+        Ff = Fs / self.preferred_fps
 
-    # Iterate over the time intervals
-    for i in range(int(audio_length)):
-        # Select the audio data for the current time interval
-        interval_data = audio[int(i*Ff):int((i+1)*Ff)]
+        # Iterate over the time intervals
+        for i in range(int(audio_length)):
+            # Select the audio data for the current time interval
+            interval_data = audio[int(i*Ff):int((i+1)*Ff)]
 
-        # Perform the FFT on the interval data
-        interval_fft = np.fft.fft(interval_data)
+            # Perform the FFT on the interval data
+            interval_fft = np.fft.fft(interval_data)
 
-        # Recalculate the frequencies for the interval data
-        interval_freqs = np.fft.fftfreq(len(interval_data), 1/Fs)
+            # Recalculate the frequencies for the interval data
+            interval_freqs = np.fft.fftfreq(len(interval_data), 1/Fs)
 
-        # Iterate over the frequency intervals and calculate the average magnitude
-        for j in range(num_intervals):
-            low_freq = intervals[j]
-            high_freq = intervals[j+1]
-            selected_mags = np.abs(interval_fft[(interval_freqs >= low_freq) & (interval_freqs <= high_freq)])
-            result[i, j] = np.mean(selected_mags)
-    return result
+            # Iterate over the frequency intervals and calculate the average magnitude
+            for j in range(num_intervals):
+                low_freq = intervals[j]
+                high_freq = intervals[j+1]
+                selected_mags = np.abs(interval_fft[(interval_freqs >= low_freq) & (interval_freqs <= high_freq)])
+                result[i, j] = np.mean(selected_mags)
+        return result
 
 if __name__ == '__main__': 
     # Load the audio file
