@@ -14,6 +14,7 @@ import math
 
 audio_path = "./monsters.mp3"
 num_intervals = 10
+num_leds = 21
 
 class MusicEffect(Effect):
     def __init__(self, ctr, audio):
@@ -30,12 +31,10 @@ class MusicEffect(Effect):
             magnitude = self.magnitudes[self.frame, i]
             if magnitude <= 0:
                 continue
-            loudness = math.sqrt(magnitude) / math.sqrt(self.max_magnitude)
-            if i == 0:
-                print(loudness)
-            for j in range(0, 21):
-                index = i * 21 + j
-                if j / 21 < loudness:
+            loudness = magnitude / self.max_magnitude
+            for j in range(0, num_leds):
+                index = i * num_leds + j
+                if abs(j - num_leds / 2) / num_leds < loudness:
                     ctr.modify_pattern(pat, index, (255, 0, 0))
                 else:
                     ctr.modify_pattern(pat, index, (0, 0, 255))
